@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BirdGo Field Map</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div>
+          <h1>BirdGo Field Map</h1>
+          <p>Troll-map style bird spotting with real iNaturalist sightings.</p>
+        </div>
+        <div class="actions">
+          <button id="locateBtn" type="button">Locate Me</button>
+          <button id="rescanBtn" type="button">Rescan Birds</button>
+          <button id="googleOverlayBtn" type="button">Use Google Overlay</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section id="mapContainer" aria-label="2D map"></section>
+
+        <aside class="panel">
+          <h2>Nearby Birds</h2>
+          <p id="status">Getting your location...</p>
+          <p id="sourceMeta" class="source-meta">
+            Source: iNaturalist (species + research-grade + photo)
+          </p>
+
+          <section class="diagnostics">
+            <h3>System Checks</h3>
+            <p id="diagnosticsSummary" class="diagnostics-summary">
+              Waiting for startup checks...
+            </p>
+            <ul id="diagnosticsList" class="diagnostics-list"></ul>
+          </section>
+
+          <section class="diagnostics">
+            <h3>Overlay + Publish Keys</h3>
+            <label for="googleMapsApiKeyInput">Google Maps JavaScript API Key</label>
+            <input
+              id="googleMapsApiKeyInput"
+              type="password"
+              placeholder="Paste key to enable Google overlay"
+            />
+            <button id="saveGoogleKeyBtn" type="button">Save Google Key</button>
+
+            <label for="inatApiTokenInput">iNaturalist API Token (publish)</label>
+            <input
+              id="inatApiTokenInput"
+              type="password"
+              placeholder="From inaturalist.org/users/api_token"
+            />
+            <button id="saveInatTokenBtn" type="button">
+              Save iNaturalist Token
+            </button>
+          </section>
+
+          <section class="diagnostics">
+            <h3>Report Bird You Saw</h3>
+            <label for="reportSpeciesInput">Bird name</label>
+            <input
+              id="reportSpeciesInput"
+              type="text"
+              placeholder="Example: Great Blue Heron"
+            />
+            <label for="reportPhotoInput">Photo (optional)</label>
+            <input id="reportPhotoInput" type="file" accept="image/*" capture="environment" />
+            <button id="submitBirdReportBtn" type="button">Add My Sighting</button>
+          </section>
+
+          <div id="birdList" class="bird-list"></div>
+
+          <section id="details" class="details hidden" aria-live="polite">
+            <h3 id="birdName">Select a bird marker</h3>
+            <p id="birdMeta"></p>
+            <h4>Walkable trail from your location</h4>
+            <ul id="birdRoute"></ul>
+            <button id="takeMeThereBtn" type="button">Take Me There</button>
+
+            <h4>Community media from this sighting</h4>
+            <div id="photoStrip" class="photo-strip"></div>
+            <div id="audioStrip" class="audio-strip"></div>
+
+            <button id="markFoundBtn" type="button">Mark Found</button>
+            <label for="uploadPhotoInput"
+              >Upload your own bird photo (enabled after Mark Found)</label
+            >
+            <input
+              id="uploadPhotoInput"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              disabled
+            />
+            <button id="publishInatBtn" type="button" disabled>
+              Publish Your Photo to iNaturalist
+            </button>
+
+            <h4>Your photos</h4>
+            <div id="userPhotoStrip" class="photo-strip"></div>
+
+            <a
+              id="inatObservationLink"
+              class="street-view-link"
+              target="_blank"
+              rel="noreferrer noopener"
+              >Open on iNaturalist</a
+            >
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <div
+      id="photoModal"
+      class="photo-modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Bird photo viewer"
+    >
+      <button id="photoModalClose" class="photo-modal-close" type="button">
+        Close
+      </button>
+      <img id="photoModalImage" alt="Bird observation photo" />
+      <p id="photoModalMessage" class="photo-modal-message hidden">
+        Could not load this image in-app. Use the observation link below.
+      </p>
+      <a
+        id="photoModalFallbackLink"
+        class="photo-modal-fallback hidden"
+        target="_blank"
+        rel="noreferrer noopener"
+        >Open source observation</a
+      >
+    </div>
+
+    <div
+      id="observationCardModal"
+      class="observation-card-modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Observation details"
+    >
+      <div class="observation-card">
+        <button id="observationCardClose" class="observation-card-close" type="button">
+          Close
+        </button>
+        <div class="observation-card-layout">
+          <section class="observation-photo-pane">
+            <img id="observationPrimaryImage" alt="Observation primary photo" />
+            <div id="observationThumbs" class="observation-thumbs"></div>
+          </section>
+          <section class="observation-meta-pane">
+            <h3 id="observationSpeciesTitle">Species</h3>
+            <p id="observationMetaText"></p>
+            <div id="observationMiniMap" class="observation-mini-map"></div>
+            <button id="takeMeThereCardBtn" type="button">Take Me There</button>
+            <a
+              id="observationOpenInat"
+              class="street-view-link"
+              target="_blank"
+              rel="noreferrer noopener"
+              >Open full observation on iNaturalist</a
+            >
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
