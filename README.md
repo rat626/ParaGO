@@ -1,11 +1,7 @@
 # ParaGo
 
-ParaGo is a web app based on Pokemon Go and Thomas Dambo's Trollmap, which aims to encourage people to locate birds around them.
-It combines OpenStreetViewer and iNaturalist to show the user a map of their current location, and surrounding bird sightings located within 24 hrs of the current time, with an additional popup displaying a recorded picture of the bird, and additional information about the spotting. 
-
-The interface also provides a "take me there" option, complete with a stylized walking route, and directions to the location of the bird sighting via Apple Maps/Google Maps/OpenStreetViewerbased on the Open Source Routing Machine foot profile, which calculates the optimal walking route for a user based on their current location. 
-
-In the future, I hope to implement this as an overlay for Google Maps via a Google Maps API Key, and API functions to customize map appearance, layot, glyph icons, and other featrres. My end goal is to create a "Pokemon Go" for finding birds, with the overarching goal of enabling people to contribute to citizen science platforms like MerlinBird, Zooniverse, and other platforms, just by finding birds arond them and photographing them for others to find the same species, or new ones in the same area.
+ParaGo is a web app for live bird spotting with a troll-map inspired UI.
+It combines nearby iNaturalist sightings with your own locally reported sightings.
 
 ## Features
 
@@ -42,7 +38,7 @@ Initialize repo (if not already initialized):
 ```bash
 git init
 git add .
-git commit -m "Initial BirdGo Field Map"
+git commit -m "Initial ParaGo"
 ```
 
 Create a new empty repo on GitHub, then connect and push:

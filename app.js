@@ -1153,7 +1153,7 @@ async function publishSelectedToInat() {
       observation: {
         species_guess: observation.species,
         taxon_id: observation.taxonId || undefined,
-        description: `Published from BirdGo. Reference: ${observation.inatUrl}`,
+        description: `Published from ParaGo. Reference: ${observation.inatUrl}`,
         latitude: observation.lat,
         longitude: observation.lon,
         observed_on_string: new Date().toISOString(),
