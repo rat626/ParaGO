@@ -8,7 +8,7 @@ It combines nearby iNaturalist sightings with your own locally reported sighting
 - Live map with your location and nearby bird sightings
 - iNaturalist observation fetch (species + research-grade(verified appearance) + photos)
 - Walkable route generation to selected sightings
-- "Mark Found" geofence flow and personal photo uploads
+- "Mark Found" geofence flow[can only mark if within a certain radius of the past sighting location] and personal photo uploads
 - Optional publish flow to iNaturalist using your token
 - Google Maps overlay toggle when API key is provided
 - **Report Bird You Saw** section to add your own local sightings
