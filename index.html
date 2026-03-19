@@ -76,6 +76,18 @@
             <button id="submitBirdReportBtn" type="button">Add My Sighting</button>
           </section>
 
+          <section class="diagnostics">
+            <h3>Bird Wishlist</h3>
+            <label for="wishlistSpeciesInput">Bird to find</label>
+            <input
+              id="wishlistSpeciesInput"
+              type="text"
+              placeholder="Example: Painted Bunting"
+            />
+            <button id="addWishlistBirdBtn" type="button">Add to Wishlist</button>
+            <ul id="wishlistList" class="wishlist-list"></ul>
+          </section>
+
           <div id="birdList" class="bird-list"></div>
 
           <section id="details" class="details hidden" aria-live="polite">

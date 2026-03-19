@@ -4,6 +4,8 @@ const NEARBY_MARK_THRESHOLD_METERS = 120;
 const DEFAULT_CENTER = { lat: 20, lon: 0 };
 const LAST_KNOWN_LOCATION_KEY = "LAST_KNOWN_BROWSER_LOCATION";
 const USER_REPORTED_SIGHTINGS_KEY = "USER_REPORTED_SIGHTINGS";
+const FOUND_SPECIES_KEY = "FOUND_SPECIES";
+const BIRD_WISHLIST_KEY = "BIRD_WISHLIST";
 
 const statusEl = document.getElementById("status");
 const sourceMetaEl = document.getElementById("sourceMeta");
@@ -28,6 +30,9 @@ const rescanBtn = document.getElementById("rescanBtn");
 const reportSpeciesInputEl = document.getElementById("reportSpeciesInput");
 const reportPhotoInputEl = document.getElementById("reportPhotoInput");
 const submitBirdReportBtnEl = document.getElementById("submitBirdReportBtn");
+const wishlistSpeciesInputEl = document.getElementById("wishlistSpeciesInput");
+const addWishlistBirdBtnEl = document.getElementById("addWishlistBirdBtn");
+const wishlistListEl = document.getElementById("wishlistList");
 
 const photoModalEl = document.getElementById("photoModal");
 const photoModalImageEl = document.getElementById("photoModalImage");
@@ -58,6 +63,8 @@ const state = {
   accuracyCircle: null,
   inatObservations: [],
   userReportedObservations: JSON.parse(localStorage.getItem(USER_REPORTED_SIGHTINGS_KEY) || "[]"),
+  wishlist: JSON.parse(localStorage.getItem(BIRD_WISHLIST_KEY) || "[]"),
+  foundSpecies: new Set(JSON.parse(localStorage.getItem(FOUND_SPECIES_KEY) || "[]")),
   observations: [],
   selectedObservationId: null,
   userLocation: null,
@@ -91,6 +98,12 @@ const state = {
 };
 
 let activeWatchId = null;
+
+function normalizeSpeciesKey(speciesName) {
+  return String(speciesName || "")
+    .trim()
+    .toLowerCase();
+}
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -879,6 +892,81 @@ function saveFoundSet() {
   localStorage.setItem("FOUND_OBSERVATIONS", JSON.stringify(Array.from(state.foundIds)));
 }
 
+function saveFoundSpecies() {
+  localStorage.setItem(FOUND_SPECIES_KEY, JSON.stringify(Array.from(state.foundSpecies)));
+}
+
+function saveWishlist() {
+  localStorage.setItem(BIRD_WISHLIST_KEY, JSON.stringify(state.wishlist));
+}
+
+function normalizeWishlistItems(items) {
+  if (!Array.isArray(items)) return [];
+  const dedup = new Set();
+  const normalized = [];
+  items.forEach((item) => {
+    const species = typeof item === "string" ? item : item?.species;
+    const text = String(species || "").trim();
+    if (!text) return;
+    const key = normalizeSpeciesKey(text);
+    if (!key || dedup.has(key)) return;
+    dedup.add(key);
+    normalized.push({
+      id: typeof item === "object" && item?.id ? item.id : `wish-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+      species: text,
+      key,
+      createdAt: typeof item === "object" && item?.createdAt ? item.createdAt : new Date().toISOString(),
+    });
+  });
+  return normalized;
+}
+
+function renderWishlist() {
+  state.wishlist = normalizeWishlistItems(state.wishlist);
+  if (state.wishlist.length === 0) {
+    wishlistListEl.innerHTML = `<li class="meta">No wishlist birds yet.</li>`;
+    return;
+  }
+  wishlistListEl.innerHTML = state.wishlist
+    .map((item) => {
+      const matched = state.foundSpecies.has(item.key);
+      return `
+        <li class="wishlist-item ${matched ? "matched" : ""}">
+          <span class="wishlist-text">
+            <span class="wishlist-prefix">${matched ? "✔" : "○"}</span>
+            ${escapeHtml(item.species)}
+          </span>
+          <button type="button" class="wishlist-remove-btn" data-wishlist-id="${item.id}">Remove</button>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function addWishlistSpecies(rawText) {
+  const text = String(rawText || "").trim();
+  if (!text) {
+    setStatus("Enter a bird name to add it to your wishlist.");
+    return;
+  }
+  const key = normalizeSpeciesKey(text);
+  if (state.wishlist.some((w) => w.key === key)) {
+    setStatus(`"${text}" is already on your wishlist.`);
+    return;
+  }
+  state.wishlist.unshift({
+    id: `wish-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+    species: text,
+    key,
+    createdAt: new Date().toISOString(),
+  });
+  state.wishlist = state.wishlist.slice(0, 120);
+  saveWishlist();
+  renderWishlist();
+  const alreadyFound = state.foundSpecies.has(key);
+  setStatus(alreadyFound ? `Added "${text}" to wishlist (already found ✔).` : `Added "${text}" to wishlist.`);
+}
+
 function renderObservations() {
   if (state.markersLayer) state.markersLayer.clearLayers();
   birdListEl.innerHTML = "";
@@ -1518,12 +1606,37 @@ function setupInteractions() {
     }
     state.foundIds.add(observation.id);
     saveFoundSet();
+    state.foundSpecies.add(normalizeSpeciesKey(observation.species));
+    saveFoundSpecies();
+    renderWishlist();
     markFoundBtn.textContent = "Marked Found ✔";
     uploadPhotoInputEl.disabled = false;
     updatePublishButtonState(observation);
     renderObservations();
     renderUserPhotoStrip(observation.id);
     setStatus(`Marked "${observation.species}" as found at this location.`);
+  });
+
+  addWishlistBirdBtnEl.addEventListener("click", () => {
+    addWishlistSpecies(wishlistSpeciesInputEl.value);
+    wishlistSpeciesInputEl.value = "";
+  });
+
+  wishlistSpeciesInputEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addWishlistSpecies(wishlistSpeciesInputEl.value);
+      wishlistSpeciesInputEl.value = "";
+    }
+  });
+
+  wishlistListEl.addEventListener("click", (event) => {
+    const btn = event.target.closest("button[data-wishlist-id]");
+    if (!btn) return;
+    const id = btn.dataset.wishlistId;
+    state.wishlist = state.wishlist.filter((item) => item.id !== id);
+    saveWishlist();
+    renderWishlist();
   });
 
   uploadPhotoInputEl.addEventListener("change", () => {
@@ -1575,6 +1688,8 @@ function setupInteractions() {
 async function boot() {
   renderDiagnostics();
   setDistanceUnit(null);
+  state.wishlist = normalizeWishlistItems(state.wishlist);
+  saveWishlist();
   state.userReportedObservations = normalizeUserReportedObservations(state.userReportedObservations);
   rebuildObservationList();
   googleMapsApiKeyInputEl.value = state.googleMapsApiKey;
@@ -1585,6 +1700,7 @@ async function boot() {
     applyResolvedLocation(lastKnown.lat, lastKnown.lon, lastKnown.accuracy, "last known browser");
   }
   setupInteractions();
+  renderWishlist();
   renderObservations();
   publishInatBtnEl.disabled = true;
   await installPermissionWatcher();

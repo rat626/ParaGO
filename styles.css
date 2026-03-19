@@ -168,6 +168,38 @@ button:hover {
   font-size: 0.79rem;
 }
 
+.wishlist-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.wishlist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.83rem;
+  color: var(--text);
+}
+
+.wishlist-item.matched .wishlist-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  color: #6a5e53;
+}
+
+.wishlist-item.matched .wishlist-prefix {
+  color: #3e744c;
+}
+
+.wishlist-remove-btn {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.74rem;
+}
+
 .diag-pass {
   color: #3e744c;
 }
