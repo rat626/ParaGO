@@ -372,6 +372,118 @@ button:hover {
   border: none;
 }
 
+.bird-icon-marker {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.bird-icon-marker--xs {
+  width: 22px;
+  height: 22px;
+}
+
+.bird-icon-marker--md {
+  width: 28px;
+  height: 28px;
+}
+
+.bird-icon-marker--lg {
+  width: 34px;
+  height: 34px;
+}
+
+.bird-icon-marker--xl {
+  width: 40px;
+  height: 40px;
+}
+
+.species-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 2px solid #f9f2de;
+  color: #1f1a15;
+  font-weight: 700;
+  line-height: 1;
+  background: hsl(var(--species-hue) 52% 58%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.22);
+}
+
+.species-icon-small {
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.68rem;
+  margin-right: 0.28rem;
+  vertical-align: middle;
+}
+
+.species-icon-large {
+  width: 24px;
+  height: 24px;
+  font-size: 0.78rem;
+}
+
+.species-icon-map--xs {
+  width: 16px;
+  height: 16px;
+  font-size: 0.58rem;
+}
+
+.species-icon-map--md {
+  width: 22px;
+  height: 22px;
+  font-size: 0.74rem;
+}
+
+.species-icon-map--lg {
+  width: 28px;
+  height: 28px;
+  font-size: 0.82rem;
+}
+
+.species-icon-map--xl {
+  width: 34px;
+  height: 34px;
+  font-size: 0.9rem;
+}
+
+.bird-icon-marker.found .species-icon {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.22),
+    0 0 0 2px rgba(63, 129, 95, 0.38);
+}
+
+.route-turn-list {
+  list-style: decimal;
+  margin: 0.5rem 0 0.6rem;
+  padding-left: 1.15rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  max-height: 9rem;
+  overflow-y: auto;
+}
+
+.route-turn-list.hidden {
+  display: none;
+}
+
+.route-turn-list:empty {
+  display: none;
+}
+
+.feather-along-route {
+  background: transparent;
+  border: none;
+  pointer-events: none;
+}
+
+.feather-along-route img {
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+}
+
 .bird-dot-marker {
   width: 20px;
   height: 20px;
@@ -388,7 +500,7 @@ button:hover {
 }
 
 .bird-dot-marker.found::after {
-  content: "✓";
+  content: "X";
   position: absolute;
   right: -5px;
   bottom: -4px;

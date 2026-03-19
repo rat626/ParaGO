@@ -16,6 +16,9 @@ const detailsEl = document.getElementById("details");
 const birdNameEl = document.getElementById("birdName");
 const birdMetaEl = document.getElementById("birdMeta");
 const birdRouteEl = document.getElementById("birdRoute");
+const routeTurnListEl = document.getElementById("routeTurnList");
+const routePreviewLinkEl = document.getElementById("routePreviewLink");
+const routeTransitLinkEl = document.getElementById("routeTransitLink");
 const markFoundBtn = document.getElementById("markFoundBtn");
 const takeMeThereBtnEl = document.getElementById("takeMeThereBtn");
 const takeMeThereCardBtnEl = document.getElementById("takeMeThereCardBtn");
@@ -262,12 +265,145 @@ function formatDistanceFromMeters(meters) {
   return `${(meters / 1000).toFixed(2)} km`;
 }
 
+/** Walking baseline: 5 km/h per mapping requirements. */
 function estimateWalkMinutes(distanceMeters, providerDurationSeconds) {
   const safeDistance = Number.isFinite(distanceMeters) ? distanceMeters : 0;
   const providerMinutes = Number.isFinite(providerDurationSeconds) ? providerDurationSeconds / 60 : 0;
-  // 1.35 m/s ~= 3.0 mph typical walking pace; clamp ETA so it is never implausibly fast.
-  const baselineMinutes = safeDistance > 0 ? safeDistance / 1.35 / 60 : 0;
+  const baselineMinutes = safeDistance > 0 ? (safeDistance / 5000) * 60 : 0;
   return Math.max(1, Math.round(Math.max(providerMinutes, baselineMinutes)));
+}
+
+function birdSizeTier(displayName, scientificName) {
+  const s = `${String(displayName || "")} ${String(scientificName || "")}`.toLowerCase();
+  if (
+    /(crane|heron|swan|pelican|stork|egret|condor|albatross|flamingo|ibis|bittern|cormorant|loon|grebe)/.test(s)
+  ) {
+    return "xl";
+  }
+  if (/(eagle|hawk|osprey|vulture|falcon|raven|crow|goose|gull|tern|turkey vulture|kite)/.test(s)) {
+    return "lg";
+  }
+  if (/(sparrow|finch|wren|warbler|hummingbird|chickadee|kinglet|gnatcatcher|vireo|titmouse|nuthatch)/.test(s)) {
+    return "xs";
+  }
+  return "md";
+}
+
+function buildGoogleTransitUrl(observation) {
+  const origin = state.userLocation ? `${state.userLocation.lat},${state.userLocation.lon}` : "";
+  const destination = `${observation.lat},${observation.lon}`;
+  const originPart = origin ? `origin=${encodeURIComponent(origin)}&` : "";
+  return `https://www.google.com/maps/dir/?api=1&${originPart}destination=${encodeURIComponent(destination)}&travelmode=transit`;
+}
+
+function buildStreetViewPreviewUrl(lat, lon) {
+  return `https://www.google.com/maps?layer=c&cbll=${encodeURIComponent(`${lat},${lon}`)}`;
+}
+
+function stripHtml(html) {
+  const d = document.createElement("div");
+  d.innerHTML = String(html || "");
+  return (d.textContent || d.innerText || "").replace(/\s+/g, " ").trim();
+}
+
+function formatOsrmStep(step) {
+  const m = step.maneuver || {};
+  const type = m.type || "";
+  const modifier = (m.modifier || "").replace(/_/g, " ");
+  const name = step.name || "";
+  const namePart = name ? ` on ${name}` : "";
+  if (type === "depart") return `Start walking${namePart}`;
+  if (type === "arrive") return "Arrive at destination";
+  if (type === "end of road") return `At end of road, continue${namePart}`;
+  if (type === "roundabout" || type === "rotary") return `Enter roundabout${namePart}`;
+  if (type === "exit roundabout") return `Exit roundabout${namePart}`;
+  if (type === "turn" || type === "new name" || type === "merge") {
+    const mod = modifier ? `${modifier} ` : "";
+    return `Turn ${mod.trim()}${namePart}`.replace(/\s+/g, " ").trim();
+  }
+  if (type === "continue" || type === "notification") return `Continue${namePart}`;
+  return `${type || "Proceed"}${namePart}`.trim();
+}
+
+function extractOsrmTurnInstructions(route) {
+  const leg = route.legs?.[0];
+  if (!leg?.steps?.length) return [];
+  return leg.steps.map(formatOsrmStep).filter(Boolean);
+}
+
+function firstOsrmTurnLocation(route) {
+  const leg = route.legs?.[0];
+  const steps = leg?.steps;
+  if (!Array.isArray(steps)) return null;
+  for (let i = 0; i < steps.length; i += 1) {
+    const loc = steps[i].maneuver?.location;
+    if (Array.isArray(loc) && loc.length >= 2) {
+      const type = steps[i].maneuver?.type;
+      if (type && type !== "depart" && type !== "arrive") return { lat: loc[1], lon: loc[0] };
+    }
+  }
+  return null;
+}
+
+function featherAlongRouteIcon() {
+  const svg = encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="14" viewBox="0 0 11 14"><path fill="#7a5c1e" opacity="0.88" d="M5.5 0.5c1.8 2.8 4.2 8.5 4.2 10.2 0 1.2-0.9 2.3-2 2.3-1 0-2-0.8-2.8-1.8C3.2 7 3.8 3.2 5.5 0.5z"/></svg>`,
+  );
+  return L.divIcon({
+    className: "feather-along-route",
+    html: `<img src="data:image/svg+xml;charset=UTF-8,${svg}" width="11" height="14" alt="" />`,
+    iconSize: [11, 14],
+    iconAnchor: [5, 7],
+  });
+}
+
+function addFeatherTrailAlongRoute(latLngs, layer) {
+  if (!Array.isArray(latLngs) || latLngs.length < 3) return;
+  const step = Math.max(1, Math.floor(latLngs.length / 24));
+  for (let i = step; i < latLngs.length - 1; i += step) {
+    L.marker(latLngs[i], {
+      icon: featherAlongRouteIcon(),
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: -200,
+    }).addTo(layer);
+  }
+}
+
+function clearRouteAuxUi() {
+  routeTurnListEl.innerHTML = "";
+  routePreviewLinkEl.classList.add("hidden");
+  routePreviewLinkEl.removeAttribute("href");
+  routeTransitLinkEl.classList.add("hidden");
+  routeTransitLinkEl.removeAttribute("href");
+}
+
+function renderTurnList(instructions) {
+  routeTurnListEl.innerHTML = "";
+  if (!Array.isArray(instructions) || instructions.length === 0) {
+    routeTurnListEl.classList.add("hidden");
+    return;
+  }
+  routeTurnListEl.classList.remove("hidden");
+  instructions.slice(0, 40).forEach((line) => {
+    const li = document.createElement("li");
+    li.textContent = line;
+    routeTurnListEl.appendChild(li);
+  });
+}
+
+function showRoutePreview(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    routePreviewLinkEl.classList.add("hidden");
+    return;
+  }
+  routePreviewLinkEl.href = buildStreetViewPreviewUrl(lat, lon);
+  routePreviewLinkEl.classList.remove("hidden");
+}
+
+function showTransitFallback(observation) {
+  routeTransitLinkEl.href = buildGoogleTransitUrl(observation);
+  routeTransitLinkEl.classList.remove("hidden");
 }
 
 function normalizeMediaUrl(url) {
@@ -301,21 +437,27 @@ function speciesHash(speciesName) {
   return hash;
 }
 
-function markerIcon(observation, found) {
-  if (observation?.source === "user") {
-    return L.divIcon({
-      className: "bird-marker-wrapper",
-      html: `<div class="bird-dot-marker user-reported-marker ${found ? "found" : ""}"></div>`,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
-    });
+function speciesIconHtml(speciesName, variant = "list") {
+  const text = String(speciesName || "").trim();
+  const letter = text ? text[0].toUpperCase() : "?";
+  const hash = speciesHash(text);
+  const hue = hash % 360;
+  if (variant === "list") {
+    return `<span class="species-icon species-icon-small" style="--species-hue:${hue}">${escapeHtml(letter)}</span>`;
   }
-  const animClass = `bird-float-${(speciesHash(observation.species) % 3) + 1}`;
+  const tier = variant === "md" || variant === "xs" || variant === "lg" || variant === "xl" ? variant : "md";
+  return `<span class="species-icon species-icon-map species-icon-map--${tier}" style="--species-hue:${hue}">${escapeHtml(letter)}</span>`;
+}
+
+function markerIcon(observation, found) {
+  const tier = observation.sizeTier || birdSizeTier(observation.species, observation.scientificName);
+  const dim = { xs: 22, md: 28, lg: 34, xl: 40 }[tier] || 28;
+  const anchor = Math.round(dim / 2);
   return L.divIcon({
     className: "bird-marker-wrapper",
-    html: `<div class="bird-dot-marker ${found ? "found" : ""} ${animClass}"></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    html: `<div class="bird-icon-marker bird-icon-marker--${tier} ${found ? "found" : ""}">${speciesIconHtml(observation.species, tier)}</div>`,
+    iconSize: [dim, dim],
+    iconAnchor: [anchor, anchor],
   });
 }
 
@@ -419,9 +561,7 @@ function saveUserReportedObservations() {
 }
 
 function rebuildObservationList() {
-  const reported = normalizeUserReportedObservations(state.userReportedObservations);
-  state.userReportedObservations = reported;
-  state.observations = [...reported, ...(Array.isArray(state.inatObservations) ? state.inatObservations : [])];
+  state.observations = Array.isArray(state.inatObservations) ? state.inatObservations.slice() : [];
 }
 
 function buildGoogleDirectionsUrl(observation) {
@@ -500,15 +640,20 @@ function renderGoogleMarkers() {
   if (!state.googleInfoWindow) state.googleInfoWindow = new window.google.maps.InfoWindow();
 
   state.observations.forEach((obs) => {
-    const isUserReported = obs.source === "user";
+    const tier = obs.sizeTier || birdSizeTier(obs.species, obs.scientificName);
+    const r = { xs: 9, md: 11, lg: 14, xl: 16 }[tier] || 11;
+    const hue = speciesHash(obs.species) % 360;
+    const pad = 4;
+    const svgSize = r * 2 + pad * 2;
+    const cx = r + pad;
     const pinImg = document.createElement("img");
     pinImg.src =
       "data:image/svg+xml;charset=UTF-8," +
       encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><circle cx="21" cy="21" r="11" fill="${isUserReported ? "#9a5c24" : "#3f6ea8"}" stroke="#f9f2de" stroke-width="3"/></svg>`,
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${svgSize}" height="${svgSize}"><circle cx="${cx}" cy="${cx}" r="${r}" fill="hsl(${hue} 52% 58%)" stroke="#f9f2de" stroke-width="2"/></svg>`,
       );
-    pinImg.width = 40;
-    pinImg.height = 40;
+    pinImg.width = svgSize;
+    pinImg.height = svgSize;
     pinImg.alt = obs.species;
 
     const marker = new AdvancedMarkerElement({
@@ -522,7 +667,7 @@ function renderGoogleMarkers() {
       state.googleInfoWindow.setContent(
         `<div style="max-width:260px;font-family:'Nunito Sans',system-ui,sans-serif">
           <strong>${escapeHtml(obs.species)}</strong><br/>
-          <span style="color:#666">${isUserReported ? "Your reported sighting" : `Seen ${formatHours(obs.hoursAgo)} ago`}</span><br/>
+          <span style="color:#666">Seen ${formatHours(obs.hoursAgo)} ago</span><br/>
           ${firstPhoto ? `<img src="${firstPhoto}" style="margin-top:6px;width:100%;border-radius:6px;" alt="Observation photo"/>` : ""}
           <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
             ${obs.inatUrl ? `<a href="${obs.inatUrl}" target="_blank" rel="noreferrer noopener">Open observation</a>` : ""}
@@ -838,19 +983,33 @@ async function fetchInatObservations() {
       const observedAt = item.time_observed_at || item.observed_on || item.created_at;
       const coords = item.geojson?.coordinates;
       const photos = Array.isArray(item.photos) ? item.photos : [];
+      const taxon = item.taxon || {};
+      const communityTaxonId = item.community_taxon_id;
       if (!coords || coords.length < 2) return null;
       if (photos.length === 0) return null;
-      if (item.taxon?.rank !== "species") return null;
+      if (taxon.rank !== "species") return null;
+      if (taxon.iconic_taxon_name !== "Aves") return null;
+      if (!taxon.name || typeof taxon.name !== "string") return null;
+      if (item.quality_grade !== "research") return null;
+      // Only draw markers for observations where community consensus confirms this exact species.
+      if (!communityTaxonId || Number(communityTaxonId) !== Number(taxon.id)) return null;
+      if (item.identifications_most_agree === false) return null;
 
+      const hoursAgo = hoursAgoFromDate(observedAt);
+      if (hoursAgo > 24) return null;
+
+      const species = item.taxon?.preferred_common_name || item.taxon?.name || "Unknown species";
+      const scientificName = item.taxon?.name || "Unknown";
       return {
         id: item.id,
-        species: item.taxon?.preferred_common_name || item.taxon?.name || "Unknown species",
-        scientificName: item.taxon?.name || "Unknown",
+        species,
+        scientificName,
+        sizeTier: birdSizeTier(species, scientificName),
         taxonId: item.taxon?.id || null,
         lat: coords[1],
         lon: coords[0],
         observedAt: new Date(observedAt).toISOString(),
-        hoursAgo: hoursAgoFromDate(observedAt),
+        hoursAgo,
         placeGuess: item.place_guess || "unknown location",
         photos: photos
           .map((photo) => ({
@@ -933,7 +1092,7 @@ function renderWishlist() {
       return `
         <li class="wishlist-item ${matched ? "matched" : ""}">
           <span class="wishlist-text">
-            <span class="wishlist-prefix">${matched ? "✔" : "○"}</span>
+            <span class="wishlist-prefix">${matched ? "X" : "O"}</span>
             ${escapeHtml(item.species)}
           </span>
           <button type="button" class="wishlist-remove-btn" data-wishlist-id="${item.id}">Remove</button>
@@ -964,7 +1123,7 @@ function addWishlistSpecies(rawText) {
   saveWishlist();
   renderWishlist();
   const alreadyFound = state.foundSpecies.has(key);
-  setStatus(alreadyFound ? `Added "${text}" to wishlist (already found ✔).` : `Added "${text}" to wishlist.`);
+  setStatus(alreadyFound ? `Added "${text}" to wishlist (already found).` : `Added "${text}" to wishlist.`);
 }
 
 function renderObservations() {
@@ -1007,12 +1166,12 @@ function renderObservations() {
     row.className = "bird-item";
     row.innerHTML = `
       <button type="button" data-observation-id="${obs.id}">
-        <strong>${escapeHtml(obs.species)}</strong>
+        <strong>${speciesIconHtml(obs.species)} ${escapeHtml(obs.species)}</strong>
         <div class="meta">${distanceText} away • ${isUserReported ? "you reported this" : `seen ${formatHours(obs.hoursAgo)} ago`}</div>
         <div class="meta">${isUserReported ? "Source: your upload" : "Source: iNaturalist research-grade"}</div>
-        ${userPhotos.length > 0 ? `<div class="meta"><span class="user-photo-count">📷 ${userPhotos.length} your photo${userPhotos.length > 1 ? "s" : ""}</span></div>` : ""}
+        ${userPhotos.length > 0 ? `<div class="meta"><span class="user-photo-count">${userPhotos.length} your photo${userPhotos.length > 1 ? "s" : ""}</span></div>` : ""}
         ${userPhotos.length > 0 ? `<img class="user-photo-thumb" src="${userPhotos[0].dataUrl}" alt="Your uploaded bird photo thumbnail" />` : ""}
-        ${found ? '<div class="found-badge">✔ Marked Found</div>' : ""}
+        ${found ? '<div class="found-badge">Marked Found</div>' : ""}
       </button>
     `;
     birdListEl.appendChild(row);
@@ -1062,6 +1221,7 @@ function chooseWalkableRoute(routes) {
 async function drawRouteToObservation(observation) {
   if (!state.userLocation) return;
   if (state.routeLayer) state.routeLayer.clearLayers();
+  clearRouteAuxUi();
   updateDiagnostics({ routeLoaded: false });
 
   if (state.useGoogleOverlay && state.googleDirectionsService && state.googleDirectionsRenderer) {
@@ -1076,19 +1236,54 @@ async function drawRouteToObservation(observation) {
       if (best) {
         state.googleDirectionsRenderer.setDirections({ ...result, routes: [best] });
         const leg = best.legs?.[0];
+        const steps = Array.isArray(leg?.steps) ? leg.steps : [];
+        const googleInstructions = steps.map((st) => stripHtml(st.instructions)).filter(Boolean);
+        renderTurnList(googleInstructions);
+        const distM = leg?.distance?.value;
+        const durS = leg?.duration?.value;
+        const etaMin = estimateWalkMinutes(distM, durS);
+        if (steps[0]?.start_location) {
+          showRoutePreview(steps[0].start_location.lat(), steps[0].start_location.lng());
+        } else if (leg?.start_location) {
+          showRoutePreview(leg.start_location.lat(), leg.start_location.lng());
+        }
         birdRouteEl.innerHTML = `
           <li>Walking route distance: ${leg?.distance?.text || "n/a"}</li>
-          <li>Estimated time: ${leg?.duration?.text || "n/a"}</li>
-          <li>Trail mode: walkable (Google Directions WALKING)</li>
+          <li>Estimated time (5 km/h minimum pace): ${etaMin} min</li>
+          <li>Mode: walking (Google DirectionsRenderer, WALKING)</li>
           <li>Observation age: ${formatHours(observation.hoursAgo)} ago</li>
           <li>Observed near: ${escapeHtml(observation.placeGuess)}</li>
         `;
         updateDiagnostics({ routeLoaded: true });
         return;
       }
+      showTransitFallback(observation);
+      birdRouteEl.innerHTML = `
+        <li>No walking route returned from Google Directions.</li>
+        <li>Try public transit below, or use Leaflet mode for OSRM walking on the map.</li>
+        <li>Observation age: ${formatHours(observation.hoursAgo)} ago</li>
+        <li>Observed near: ${escapeHtml(observation.placeGuess)}</li>
+      `;
+      renderTurnList([]);
+      updateDiagnostics({ routeLoaded: false });
+      return;
     } catch (_error) {
-      // Continue to OSRM fallback.
+      showTransitFallback(observation);
+      birdRouteEl.innerHTML = `
+        <li>Walking directions failed in-map (Google Directions WALKING).</li>
+        <li>Try public transit below, or switch to Leaflet mode for OSRM walking.</li>
+        <li>Observation age: ${formatHours(observation.hoursAgo)} ago</li>
+        <li>Observed near: ${escapeHtml(observation.placeGuess)}</li>
+      `;
+      renderTurnList([]);
+      updateDiagnostics({ routeLoaded: false });
+      return;
     }
+  }
+
+  if (!state.routeLayer) {
+    updateDiagnostics({ routeLoaded: false });
+    return;
   }
 
   const start = [state.userLocation.lon, state.userLocation.lat];
@@ -1104,25 +1299,34 @@ async function drawRouteToObservation(observation) {
     if (!route?.geometry?.coordinates?.length) throw new Error("route not found");
     const latLngs = route.geometry.coordinates.map((c) => [c[1], c[0]]);
     const sketchLatLngs = handDrawnRouteLatLngs(latLngs, observation.id);
-    L.polyline(latLngs, { color: "#f7e2a7", weight: 8, opacity: 0.55 }).addTo(state.routeLayer);
+    L.polyline(latLngs, { color: "#f4e4b8", weight: 10, opacity: 0.45 }).addTo(state.routeLayer);
     L.polyline(sketchLatLngs, {
       color: "#c6a03b",
       weight: 4,
-      opacity: 0.95,
-      dashArray: "9 8",
+      opacity: 0.92,
+      dashArray: "6 10",
       lineCap: "round",
       lineJoin: "round",
+      className: "feather-trail-polyline",
     }).addTo(state.routeLayer);
+    addFeatherTrailAlongRoute(sketchLatLngs, state.routeLayer);
+
+    const instructions = extractOsrmTurnInstructions(route);
+    renderTurnList(instructions);
+    const turnLoc = firstOsrmTurnLocation(route);
+    if (turnLoc) showRoutePreview(turnLoc.lat, turnLoc.lon);
+    else showRoutePreview((state.userLocation.lat + observation.lat) / 2, (state.userLocation.lon + observation.lon) / 2);
 
     birdRouteEl.innerHTML = `
       <li>Walking route distance: ${formatDistanceFromMeters(route.distance)}</li>
-      <li>Estimated time: ${estimateWalkMinutes(route.distance, route.duration)} min</li>
-      <li>Trail mode: walkable (OSRM foot profile)</li>
+      <li>Estimated time (5 km/h minimum pace): ${estimateWalkMinutes(route.distance, route.duration)} min</li>
+      <li>Trail: walkable foot path (OSRM foot), feather trail on map</li>
       <li>Observation age: ${formatHours(observation.hoursAgo)} ago</li>
       <li>Observed near: ${escapeHtml(observation.placeGuess)}</li>
     `;
     updateDiagnostics({ routeLoaded: true });
   } catch (_error) {
+    showTransitFallback(observation);
     const direct = distanceMeters(state.userLocation.lat, state.userLocation.lon, observation.lat, observation.lon);
     L.polyline(
       [
@@ -1131,8 +1335,11 @@ async function drawRouteToObservation(observation) {
       ],
       { color: "#c6a03b", weight: 3, opacity: 0.7, dashArray: "7 8" },
     ).addTo(state.routeLayer);
+    renderTurnList([]);
+    showRoutePreview((state.userLocation.lat + observation.lat) / 2, (state.userLocation.lon + observation.lon) / 2);
     birdRouteEl.innerHTML = `
-      <li>Direct distance: ${formatDistanceFromMeters(direct)} (routing unavailable)</li>
+      <li>Direct distance: ${formatDistanceFromMeters(direct)} (no walking network route found)</li>
+      <li>Try public transit below, or open walking directions in an external map.</li>
       <li>Observation age: ${formatHours(observation.hoursAgo)} ago</li>
       <li>Observed near: ${escapeHtml(observation.placeGuess)}</li>
     `;
@@ -1411,8 +1618,7 @@ async function selectObservation(observationId) {
   birdNameEl.textContent = observation.species;
   const distM = state.userLocation ? distanceMeters(state.userLocation.lat, state.userLocation.lon, observation.lat, observation.lon) : NaN;
   const distLabel = Number.isFinite(distM) ? formatDistanceFromMeters(distM) : "distance unavailable";
-  const sourceLabel =
-    observation.source === "user" ? "user reported sighting" : "species-level research grade";
+  const sourceLabel = "species-level research grade";
   birdMetaEl.textContent = `${distLabel} away • ${formatHours(observation.hoursAgo)} ago • ${sourceLabel}`;
 
   if (observation.inatUrl) {
@@ -1431,7 +1637,7 @@ async function selectObservation(observationId) {
 
   const found = state.foundIds.has(observation.id);
   markFoundBtn.disabled = found || !canMarkFound(observation);
-  markFoundBtn.textContent = found ? "Marked Found ✔" : "Mark Found";
+  markFoundBtn.textContent = found ? "Marked Found" : "Mark Found";
   uploadPhotoInputEl.disabled = !found;
   uploadPhotoInputEl.value = "";
 
@@ -1471,10 +1677,15 @@ async function refreshSightings() {
       provider: "iNaturalist",
       routeLoaded: false,
     });
-    setStatus(observations.length > 0 ? `Tracking ${observations.length} iNaturalist sightings + your uploads.` : "No iNaturalist sightings found nearby. Add your own bird sighting.");
-    setSourceMeta("Source: iNaturalist observations + your local sightings");
+    setStatus(
+      observations.length > 0
+        ? `Tracking ${observations.length} iNaturalist sightings from the last 24 hours.`
+        : "No iNaturalist sightings found nearby in the last 24 hours.",
+    );
+    setSourceMeta("Source: iNaturalist observations from the last 24 hours");
     detailsEl.classList.add("hidden");
     if (state.routeLayer) state.routeLayer.clearLayers();
+    clearRouteAuxUi();
     if (state.useGoogleOverlay && state.googleDirectionsRenderer) {
       state.googleDirectionsRenderer.set("directions", null);
     }
@@ -1487,7 +1698,7 @@ async function refreshSightings() {
       liveBirdCount: 0,
       provider: `iNaturalist error: ${error.message}`,
     });
-    setStatus(`Could not fetch iNaturalist data: ${error.message}. Your local sightings are still shown.`);
+    setStatus(`Could not fetch iNaturalist data: ${error.message}.`);
   }
 }
 
@@ -1609,7 +1820,7 @@ function setupInteractions() {
     state.foundSpecies.add(normalizeSpeciesKey(observation.species));
     saveFoundSpecies();
     renderWishlist();
-    markFoundBtn.textContent = "Marked Found ✔";
+    markFoundBtn.textContent = "Marked Found";
     uploadPhotoInputEl.disabled = false;
     updatePublishButtonState(observation);
     renderObservations();

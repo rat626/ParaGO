@@ -49,7 +49,16 @@ git branch -M main
 git push -u origin main
 ```
 
+## Tests
+
+```bash
+npm test
+```
+
+Validates walking ETA (5 km/h baseline), walking-mode URL shape, and bird size tier helpers (mirrors `app.js` logic).
+
 ## Notes
 
-- This is a static frontend app; no build step required.
-- Keep API keys/tokens in local browser storage only.
+- Static frontend; no build step for the map UI.
+- Optional Google overlay uses `DirectionsRenderer` with `TravelMode.WALKING`.
+- Default map uses Leaflet plus OSRM `foot` profile; external Google Maps links use `travelmode=walking`.

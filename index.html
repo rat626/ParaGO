@@ -20,7 +20,7 @@
         <div class="actions">
           <button id="locateBtn" type="button">Locate Me</button>
           <button id="rescanBtn" type="button">Rescan Birds</button>
-          <button id="googleOverlayBtn" type="button">Use Google Overlay</button>
+          <button id="googleOverlayBtn" class="hidden" type="button">Use Google Overlay</button>
         </div>
       </header>
 
@@ -28,7 +28,7 @@
         <section id="mapContainer" aria-label="2D map"></section>
 
         <aside class="panel">
-          <h2>Nearby Birds</h2>
+          <h2>Life List</h2>
           <p id="status">Getting your location...</p>
           <p id="sourceMeta" class="source-meta">
             Source: iNaturalist (species + research-grade + photo)
@@ -42,7 +42,7 @@
             <ul id="diagnosticsList" class="diagnostics-list"></ul>
           </section>
 
-          <section class="diagnostics">
+          <section class="diagnostics hidden">
             <h3>Overlay + Publish Keys</h3>
             <label for="googleMapsApiKeyInput">Google Maps JavaScript API Key</label>
             <input
@@ -63,7 +63,7 @@
             </button>
           </section>
 
-          <section class="diagnostics">
+          <section class="diagnostics hidden">
             <h3>Report Bird You Saw</h3>
             <label for="reportSpeciesInput">Bird name</label>
             <input
@@ -76,7 +76,7 @@
             <button id="submitBirdReportBtn" type="button">Add My Sighting</button>
           </section>
 
-          <section class="diagnostics">
+          <section class="diagnostics hidden">
             <h3>Bird Wishlist</h3>
             <label for="wishlistSpeciesInput">Bird to find</label>
             <input
@@ -95,6 +95,21 @@
             <p id="birdMeta"></p>
             <h4>Walkable trail from your location</h4>
             <ul id="birdRoute"></ul>
+            <ul id="routeTurnList" class="route-turn-list hidden" aria-label="Turn by turn directions"></ul>
+            <a
+              id="routePreviewLink"
+              class="street-view-link hidden"
+              target="_blank"
+              rel="noreferrer noopener"
+              >Preview key turn (Street View)</a
+            >
+            <a
+              id="routeTransitLink"
+              class="street-view-link hidden"
+              target="_blank"
+              rel="noreferrer noopener"
+              >Open public transit directions</a
+            >
             <button id="takeMeThereBtn" type="button">Take Me There</button>
 
             <h4>Community media from this sighting</h4>
@@ -102,22 +117,23 @@
             <div id="audioStrip" class="audio-strip"></div>
 
             <button id="markFoundBtn" type="button">Mark Found</button>
-            <label for="uploadPhotoInput"
+            <label class="hidden" for="uploadPhotoInput"
               >Upload your own bird photo (enabled after Mark Found)</label
             >
             <input
               id="uploadPhotoInput"
+              class="hidden"
               type="file"
               accept="image/*"
               capture="environment"
               disabled
             />
-            <button id="publishInatBtn" type="button" disabled>
+            <button id="publishInatBtn" class="hidden" type="button" disabled>
               Publish Your Photo to iNaturalist
             </button>
 
-            <h4>Your photos</h4>
-            <div id="userPhotoStrip" class="photo-strip"></div>
+            <h4 class="hidden">Your photos</h4>
+            <div id="userPhotoStrip" class="photo-strip hidden"></div>
 
             <a
               id="inatObservationLink"
